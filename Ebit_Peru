@@ -1,0 +1,204 @@
+library(dplyr)
+library(tidyverse)
+
+merging<-function(db,dicCCOS,tmpEBIT){
+ db2<-merge(db,dicCCOS,by="ccos",all.x=T,sort=F)
+ db2<-db2[!is.na(db2$market),]
+ vNames<-c("Cuenta","Neto","Cuenta1","no_tipo","ccos")
+ out<-rbind(tmpEBIT,db2[vNames])
+ return(out)
+}
+
+cleaning<-function(db,dicCCOS){
+ db2<-merge(db,dicCCOS,by="ccos",all.x=T,sort=F)
+ db2<-db2[is.na(db2$market),]
+ vNames<-c("Cuenta","Neto","Cuenta1","no_tipo","ccos")
+ out<-db2[vNames]
+ return(out)
+}
+
+distribution<-function(tmp,tmp2){
+ tmp<-merge(tmp,tmp2,by="receptor",all.x=T,sort=F)
+ tmp<-tmp[!is.na(tmp$dist),]
+ tmp$id<-paste0(tmp$ccos,tmp$Cuenta1,tmp$no_tipo)
+ tmp2<-data.frame(summarize(group_by(tmp,id),total=sum(dist)))
+ tmp<-merge(tmp,tmp2,by="id",all.x=T,sort=F)
+ tmp$Neto<-tmp$Neto*(tmp$dist/tmp$total)
+ tmp$ccos<-tmp$receptor
+ vNames<-c("Cuenta","Neto","Cuenta1","no_tipo","ccos")
+ return(tmp[vNames])	
+}
+
+
+
+
+
+Peru2<-"C:/Users/torressilva.12/OneDrive - Teleperformance/Documents/PERÚ/10 tmpEBIT/Peru"
+Peru<-"C:/Users/torressilva.12/OneDrive - Teleperformance/Documents/PERÚ/10 tmpEBIT/Peru"
+
+
+actEBIT<-function(año,mes,pais,trm=1){
+ setwd(pais)
+ db<-read_csv("Journal.csv")
+ dbInfodrivers<-read_csv("dbEBIT2/dbInfodrivers.csv")#CLIENTPROGRAM
+ dicAreas<-read_csv("dbEBIT2/dicAreas.csv")#CLIENTPROGRAM
+ dicCCOS<-read_csv("dbEBIT2/dicCCOS.csv")#CLIENTPROGRAM
+ dicDist<-read_csv("dbEBIT2/dicDist.csv")#CLIENTPROGRAM
+ dicCuenta<-read_csv("dbEBIT2/dicCuenta.csv")#ACCOUNTING
+ #dicCuenta1<-read.csv2("dbEBIT2/dicCuenta1.csv")#ACCOUNTING
+ dicTipo<-read_csv("dbEBIT2/dicTipo.csv")#P&L CONCEPT,no_tipo,GCOA,Magnitude Account
+ cloud<-read_csv("dbEBIT2/cloud.csv")#CLIENTPROGRAM
+ addition<-read_csv("dbEBIT2/addition.csv")#CeCo
+ 
+ tmpEBIT<-data.frame()
+ dbEBIT<-data.frame()
+ 
+ db<-db[c("CLIENTPROGRAM","MAINACCOUNT","GROUPCHARTOFACCOUNTS","ACCOUNTINGCURRENCYAMOUNT")]
+ db<-rename(db,GCOA=GROUPCHARTOFACCOUNTS)
+ db$Neto<-as.numeric(db$ACCOUNTINGCURRENCYAMOUNT)
+ #db$Neto<-db$REPORTINGCURRENCYAMOUNT
+ dbEBIT<-dbEBIT[paste(dbEBIT$año,dbEBIT$mes)!=paste(año,mes),]
+ 
+ ##
+ addition$CLIENTPROGRAM<-addition$Ceco
+ addition$MAINACCOUNT<-addition$Cuenta
+ #addition$GCOA<-addition$GCOA
+ #addition$SITE<-1
+ addition$Neto<-addition$Valor_US*trm
+ addition$ACCOUNTINGCURRENCYAMOUNT<-addition$Valor_US
+ addition<-addition[c("CLIENTPROGRAM","MAINACCOUNT","GCOA","ACCOUNTINGCURRENCYAMOUNT","Neto")]
+ db<-rbind(db,addition)
+ db$Cuenta<-as.character(substr(db$MAINACCOUNT,0,10))
+ db$Cuenta1<-db$Cuenta
+ 
+ ##
+ db<-merge(db,dicTipo,by="GCOA",all.x=T,sort=F)
+ db$ccos<-as.character(substr(db$CLIENTPROGRAM,0,11))
+ dicCCOS$ccos<-as.character(substr(dicCCOS$CLIENTPROGRAM,0,11))
+ dicDist$ccos<-as.character(substr(dicDist$CLIENTPROGRAM,0,11))
+ dbInfodrivers$ccos<-as.character(substr(dbInfodrivers$CLIENTPROGRAM,0,11))
+ dicAreas$ccos<-as.character(substr(dicAreas$CLIENTPROGRAM,0,11))
+ cloud$receptor<-as.character(substr(cloud$CLIENTPROGRAM,0,11))
+ dicCuenta$Cuenta<-as.character(dicCuenta$Cuenta)
+ #dicCuenta1$Cuenta1<-as.character(dicCuenta1$Cuenta)
+ ##
+ 
+ tmpEBIT<-merging(db,dicCCOS,tmpEBIT)
+ db<-cleaning(db,dicCCOS)
+ db$Cuenta<-db$ccos
+ db<-data.frame(summarize(group_by(db,ccos,Cuenta,Cuenta1,no_tipo),Neto=sum(Neto)))
+ db<-merge(db,dicDist,by="ccos",all.x=T,sort=F)
+ control<-db[is.na(db$criterio),]
+ if(dim(control)[1]>0){
+  #control<-control$ccos
+  write.table(control,"dbEBIT2/control.csv",sep=",",dec=".",row.names=FALSE)
+  stop("ccos without distribution criteria")
+ }
+ rm(control)
+ tmpEBIT<-data.frame(summarize(group_by(tmpEBIT,Cuenta,Cuenta1,no_tipo,ccos),Neto=sum(Neto)))
+ dbGroup<-data.frame()
+ num1<-suppressWarnings(x_num<-as.numeric(dicDist$grupo))
+ num1[is.na(num1)]<-0
+ num1<-max(as.numeric(num1))
+ for(i in 1:num1){
+  vNames<-c("ccos",paste0("Grupo",i))
+  tmp<-dicCCOS[vNames]
+  tmp<-tmp[tmp[2]==1,]
+  tmp$grupo=i
+  dbGroup<-rbind(dbGroup,tmp[c("ccos","grupo")])
+ }
+ rm(tmp,i,num1,x_num)
+ names(dbGroup)<-c("receptor","grupo")
+ 
+ vCriteria<-c("HC","WS","PPH")
+ #vCriteria<-c("HC")
+ for(i in vCriteria){
+  tmp<-db[db$criterio==i,]
+  tmp$Cuenta1<-tmp$Cuenta
+  tmp<-data.frame(summarize(group_by(tmp,ccos,Cuenta,Cuenta1,no_tipo,criterio,grupo),Neto=sum(Neto)))
+  tmp<-merge(tmp,dbGroup,by="grupo",all.x=T,sort=F)
+  vNames<-c("ccos",i)
+  tmp2<-dbInfodrivers[vNames]
+  names(tmp2)<-c("receptor","dist")
+  tmp<-distribution(tmp,tmp2)
+  tmp$Cuenta<-as.factor(tmp$Cuenta)
+  tmp$Cuenta1<-as.factor(tmp$Cuenta1)
+  tmpEBIT<-rbind(tmpEBIT,tmp)
+ }
+ 
+ tmp<-db[db$criterio=="NR",]
+ tmp$Cuenta1<-tmp$Cuenta
+ tmp<-data.frame(summarize(group_by(tmp,ccos,Cuenta,Cuenta1,no_tipo,criterio,grupo),Neto=sum(Neto)))
+ tmp<-merge(tmp,dbGroup,by="grupo",all.x=T,sort=F)
+ tmp2<-data.frame(summarize(group_by(tmpEBIT[tmpEBIT$no_tipo==1,],ccos),dist=sum(Neto)))
+ names(tmp2)<-c("receptor","dist")
+ tmp<-distribution(tmp,tmp2)
+ tmp$Cuenta<-as.factor(tmp$Cuenta)
+ tmp$Cuenta1<-as.factor(tmp$Cuenta1)
+ prueba<-tmp2
+ tmpEBIT<-rbind(tmpEBIT,tmp)
+ tmpEBIT<-data.frame(summarize(group_by(tmpEBIT,Cuenta,Cuenta1,no_tipo,ccos),Neto=sum(Neto)))
+ prueba<-merge(prueba,cloud,by="receptor",all.x=T,sort=F)
+ prueba <- mutate(prueba,dist=ifelse(is.na(prueba$PERCENT_CLOUD),prueba$dist,
+                                     (prueba$dist-(prueba$PERCENT_CLOUD*prueba$dist))))
+ ###AQUI
+ db<-db[db$criterio=="OC",]
+ db<-merge(db,dicAreas,by="ccos",all.x=T,sort=F)
+ db$ops_net<-db$Neto*db$ops_area
+ db$adm_net<-db$Neto*db$adm_area
+ tmp<-data.frame(summarize(group_by(db,Cuenta1,no_tipo),Neto=sum(adm_net)))
+ tmp$grupo<-1
+ tmp$ccos<-99999
+ tmp$Cuenta<-tmp$ccos
+ tmp<-merge(tmp,dbGroup,by="grupo",all.x=T,sort=F)
+ vNames<-c("ccos","WS")
+ tmp2<-dbInfodrivers[vNames]
+ names(tmp2)<-c("receptor","dist")
+ tmp<-distribution(tmp,prueba)
+ tmp$Cuenta<-as.factor(tmp$Cuenta)
+ tmp$Cuenta1<-as.factor(tmp$Cuenta1)
+ tmp<-data.frame(summarize(group_by(tmp,Cuenta,Cuenta1,no_tipo,ccos),Neto=sum(Neto)))
+ tmpEBIT<-rbind(tmpEBIT,tmp)
+ 
+ tmp<-data.frame(summarize(group_by(db,ccos,Cuenta,Cuenta1,no_tipo,building),Neto=sum(ops_net)))
+ rm(db)
+ tmp2<-dbInfodrivers[c("ccos","SITE")]
+ names(tmp2)<-c("receptor","building")
+ tmp<-merge(tmp,tmp2,by="building",all.x=T,sort=F)
+ tmp2<-dbInfodrivers[c("ccos","WS")]
+ names(tmp2)<-c("receptor","dist")
+ tmp<-distribution(tmp,tmp2)
+ tmp$Cuenta<-as.factor(tmp$Cuenta)
+ tmp$Cuenta1<-as.factor(tmp$Cuenta1)
+ tmp<-data.frame(summarize(group_by(tmp,Cuenta,Cuenta1,no_tipo,ccos),Neto=sum(Neto)))
+ tmpEBIT<-rbind(tmpEBIT,tmp)
+ rm(tmp,tmp2,dbEBIT,dbInfodrivers,dicAreas,dicDist)
+ 
+ 
+ tmpEBIT$año<-año
+ tmpEBIT$mes<-mes
+ tmpEBIT<-merge(tmpEBIT,dicCuenta,by="Cuenta",all.x=T,sort=F)
+ control<-tmpEBIT[is.na(tmpEBIT$descripcion_cuenta),]
+ if(dim(control)[1]>0){
+  control<-control$Cuenta
+  write.table(control,"dbEBIT2/control.csv",sep=",",dec=".",row.names=FALSE)
+  stop("unknown Cuenta")
+ }
+ 
+ dicCCOS<-dicCCOS[c("campanna","ccos","Cluster","market")]
+ tmpEBIT<-merge(tmpEBIT,dicCCOS,by="ccos",all.x=T,sort=F)
+ control<-tmpEBIT[is.na(tmpEBIT$market),]
+ if(dim(control)[1]>0){
+  control<-control$ccos
+  write.table(control,"dbEBIT2/control.csv",sep=",",dec=".",row.names=FALSE)
+  stop("unknown client")
+ }
+ dicTipo<-distinct(dicTipo,no_tipo,descripcion_tipo)
+ tmpEBIT<-merge(tmpEBIT,dicTipo,by="no_tipo",all.x=T,sort=F)
+ tmpEBIT<-tmpEBIT[c("ccos","Cuenta","Neto","año","mes","descripcion_cuenta","descripcion_cuenta1","campanna","Cluster","market","descripcion_tipo")]
+ rm(control,dicCCOS,dicCuenta)	
+ tmpEBIT<-tmpEBIT[!is.na(tmpEBIT$Neto),]
+ write.table(tmpEBIT,"dbEBIT2/tmpEBIT.csv",sep=",",dec=".",row.names=FALSE)
+ 
+}
+
