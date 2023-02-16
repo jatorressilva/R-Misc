@@ -1,0 +1,134 @@
+library(readxl)
+library(tidyverse)
+library(dplyr)
+
+
+MATRICES <- read_excel(str_c("D:/working directory/CENTRODECOSTOS/Matrices.xlsx"),sheet = "Matrices")
+DIRECCIÓN<-"C:/Users/User/Dropbox/PLANEACION_FINANCIERA/Matrices/Domestico/"
+Total_Cargos<-data.frame()
+Total_Costo<-data.frame()
+Total_Indicadores<-data.frame()
+Total_Revenue<-data.frame()
+Total_TRM<-data.frame()
+Total_Volumen<-data.frame()
+fecha2<-Sys.Date()
+
+num<-nrow(MATRICES)
+
+for(i in 1:num){
+  ARCHIVO<-MATRICES[i,]
+  rangos <- data.frame(read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "Var Diaria", range = "O1:AE2"))
+  #TRM
+  TRM <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "ingreso", range = rangos[,13],col_names=c("TIPO TRM","VALOR"))
+  nombres<-names(TRM)
+  TRM$'CLIENTE'<-rangos[,3]
+  TRM$'CAMPAÑA'<-rangos[,4]
+  TRM$'FECHA 1'<-rangos[,1]
+  TRM$'FECHA 2'<-fecha2
+  TRM <- TRM [ , c('CLIENTE','CAMPAÑA','FECHA 1','FECHA 2',nombres)]
+  rm(nombres)
+  
+  #INGRESOS
+  Revenue1 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,5])
+  nombres<-names(Revenue1)
+  if (rangos[,5]>rangos[,11]){
+    Revenue2 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,11])
+    names(Revenue2)<-c(nombres)
+    Revenue <- rbind(Revenue1,Revenue2)
+  }else{Revenue<-Revenue1}
+  bon_pen <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,6])
+  colnames(bon_pen)[1]<-"INGRESOS"
+  Revenue<-rbind(Revenue,bon_pen)
+  TASA <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,7],col_names = c("ING"))
+  TASA_ACT <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = gsub("M","J",rangos[,7]),col_names = c("ING"))
+  MES_ANT <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,8],col_names = c("ING"))
+  MES_ACT <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = gsub("M","J",rangos[,8]),col_names = c("ING"))
+  NUM1<-data.frame("A"=c("Impacto Tasa","Meses Anteriores"),"B"=c(TASA_ACT$ING,MES_ACT$ING),"C"=c(0,0),"D"=c(0,0),"E"=c(TASA$ING,MES_ANT$ING))
+  names(NUM1)<-c(names(Revenue))
+  Revenue<-rbind(Revenue,NUM1)
+  
+  Revenue<-data.frame(Revenue[,1],Revenue[,2:5]*1000000)
+  nombres<-names(Revenue)
+  nombres_IND<-names(Revenue)
+  Revenue$'CLIENTE'<-rangos[,3]
+  Revenue$'CAMPAÑA'<-rangos[,4]
+  Revenue$'FECHA 1'<-rangos[,1]
+  Revenue$'FECHA 2'<-fecha2
+  Revenue <- Revenue [ , c('CLIENTE','CAMPAÑA','FECHA 1','FECHA 2',nombres)]
+  rm(NUM1,TASA,Revenue1,MES_ANT,bon_pen,nombres,TASA_ACT,MES_ACT)
+  
+  #VOLUMENES
+  Volumen1 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,16])
+  if (rangos[,16]>rangos[,17]){
+    Volumen2 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,17])
+    Volumen <- rbind(Volumen1,Volumen2)
+  }else{Volumen<-Volumen1}
+  nombres<-names(Volumen)
+  Volumen$'CLIENTE'<-rangos[,3]
+  Volumen$'CAMPAÑA'<-rangos[,4]
+  Volumen$'FECHA 1'<-rangos[,1]
+  Volumen$'FECHA 2'<-fecha2
+  Volumen <- Volumen [ , c('CLIENTE','CAMPAÑA','FECHA 1','FECHA 2',nombres)]
+  rm(Volumen1,nombres)
+  
+  #CARGOS
+  Cargos <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,12])
+  Cargos<-data.frame(Cargos[,1],Cargos[,2:5]*1000000)
+  nombres<-names(Cargos)
+  Cargos$'CLIENTE'<-rangos[,3]
+  Cargos$'CAMPAÑA'<-rangos[,4]
+  Cargos$'FECHA 1'<-rangos[,1]
+  Cargos$'FECHA 2'<-fecha2
+  Cargos <- Cargos [ , c('CLIENTE','CAMPAÑA','FECHA 1','FECHA 2',nombres)]
+  rm(nombres)
+  
+  #COSTO
+  Cos1 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,15])
+  Cos1$TIPO<-"Nomina"
+  Cos2 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,9],col_name=c("A","B","C","D","E"))
+  Cos2$TIPO<-"Otros nomina"
+  names(Cos2)<-c(names(Cos1))
+  Cos3 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,10],col_name=c("A","B","C","D","E"))
+  Cos3$TIPO<-"Otros"
+  names(Cos3)<-c(names(Cos1))
+  Costo<-rbind(Cos1,Cos2,Cos3)
+  Costo<-data.frame(Costo[,1],Costo[,2:5]*1000000,Costo[,6])
+  
+  nombres<-names(Costo)
+  Costo$'CLIENTE'<-rangos[,3]
+  Costo$'CAMPAÑA'<-rangos[,4]
+  Costo$'FECHA 1'<-rangos[,1]
+  Costo$'FECHA 2'<-fecha2
+  Costo <- Costo [ , c('CLIENTE','CAMPAÑA','FECHA 1','FECHA 2',nombres)]
+  rm(Cos1,Cos2,Cos3,nombres)
+  
+  #INDICADORES
+  INDICADORES <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "resume", range = rangos[,14])
+  names(INDICADORES)<-c("INDICADOR",nombres_IND[2:5])
+  INDICADORES<-INDICADORES[!is.na(INDICADORES[,1]),]
+  nombres<-names(INDICADORES)
+  INDICADORES$'CLIENTE'<-rangos[,3]
+  INDICADORES$'CAMPAÑA'<-rangos[,4]
+  INDICADORES$'FECHA 1'<-rangos[,1]
+  INDICADORES$'FECHA 2'<-fecha2
+  INDICADORES <- INDICADORES [ , c('CLIENTE','CAMPAÑA','FECHA 1','FECHA 2',nombres)]
+  rm(nombres,nombres_IND)
+  
+  #SUMATORIA
+  Total_Cargos<-rbind(Total_Cargos,Cargos)
+  Total_Costo<-rbind(Total_Costo,Costo)
+  Total_Indicadores<-rbind(Total_Indicadores,INDICADORES)
+  Total_Revenue<-rbind(Total_Revenue,Revenue)
+  Total_TRM<-rbind(Total_TRM,TRM)
+  Total_Volumen<-rbind(Total_Volumen,Volumen)
+  rm(Cargos,Costo,INDICADORES,Revenue,TRM,Volumen,rangos)
+}
+
+write.table(Total_Cargos,"D:/working directory/CENTRODECOSTOS/cargos.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_Costo,"D:/working directory/CENTRODECOSTOS/costo.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_Indicadores,"D:/working directory/CENTRODECOSTOS/indicadores.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_Revenue,"D:/working directory/CENTRODECOSTOS/revenue.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_TRM,"D:/working directory/CENTRODECOSTOS/trm.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_Volumen,"D:/working directory/CENTRODECOSTOS/volumen.csv",sep=";",dec=",",row.names=FALSE)
+
+
