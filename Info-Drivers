@@ -1,0 +1,159 @@
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(xlsx)
+
+IMPUTS_2 <- read_excel(str_c("D:/working directory/CENTRODECOSTOS/Imputs.xlsx"),sheet = "Imputs")
+IMPUTS <- read_excel(str_c("D:/working directory/CENTRODECOSTOS/Imputs.xlsx"),sheet = "Hoja1")
+DIRECCIÓN<-"D:/working directory/CENTRODECOSTOS/inputs2/"
+Total_Staff<-data.frame()
+Total_dbCPI<-data.frame()
+Total_dbCPI_Costo<-data.frame()
+Total_dbCPI_Revenue<-data.frame()
+Total_InfoDrivers<-data.frame()
+Total_dicDirectCost_New<-data.frame()
+Total_dbNetRevenue<-data.frame()
+Resumen<-data.frame()
+
+num<-nrow(IMPUTS_2)
+
+for(i in 1:num){
+  ARCHIVO<-IMPUTS[i,]
+  
+  Resumen1 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "Baseline Inputs", range = "A6:M12",
+                         col_name=c("TIP","jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"))
+  nombres<-names(Resumen1)
+  num1 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "Baseline Inputs", range = "B4",col_name=c("a"))
+  num1<-as.character(num1$a)
+  Resumen1$Cliente<-num1
+  Resumen1 <- Resumen1 [ , c("Cliente",nombres)]
+  
+                         
+  Staff <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "Staff Baseline", range = "A1:G301")
+  dbCPI <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "dbCPI Baseline", range = "A1:F13")
+  dbCPI_Revenue <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "dbCPI Revenue Baseline", range = "A1:F13")
+  InfoDrivers <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "InfoDrivers Baseline", range = "A1:I13")
+  dicDirectCost <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "dicDirectCost_New Baseline", range = "A1:F889")
+  #dbNetRevenue <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "dbNetRevenue Baseline", 
+  #                           col_types = c("numeric", "numeric", "text", "text", "text", "text", "text", 
+  #                                         "text", "text", "numeric", "numeric"), na = "0",range = "C2:K722")
+  
+  #SUMATORIA
+  Resumen<-rbind(Resumen,Resumen1)
+  Total_Staff<-rbind(Total_Staff,Staff)
+  Total_dbCPI<-rbind(Total_dbCPI,dbCPI)
+  Total_dbCPI_Costo<-rbind(Total_dbCPI_Costo,dbCPI)
+  Total_dbCPI_Revenue<-rbind(Total_dbCPI_Revenue,dbCPI_Revenue)
+  Total_InfoDrivers<-rbind(Total_InfoDrivers,InfoDrivers)
+  Total_dicDirectCost_New<-rbind(Total_dicDirectCost_New,dicDirectCost)
+  #Total_dbNetRevenue<-rbind(Total_dbNetRevenue,dbNetRevenue)
+  
+  rm(Staff,dbCPI,dbCPI_Revenue,InfoDrivers,dicDirectCost,Resumen1,nombres,num1)  #,dbNetRevenue
+ 
+}
+
+num1<-data.frame(Resumen)
+colnames(num1)[1]<-"Cliente"
+num1 %>% rename(Cliente)
+
+write.table(Resumen,"D:/working directory/CENTRODECOSTOS/imputs/Resumen.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_Staff,"D:/working directory/CENTRODECOSTOS/imputs/Total_Staff.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_dbCPI,"D:/working directory/CENTRODECOSTOS/imputs/Total_dbCPI.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_dbCPI_Costo,"D:/working directory/CENTRODECOSTOS/imputs/Total_dbCPI_Costo.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_dbCPI_Revenue,"D:/working directory/CENTRODECOSTOS/imputs/Total_dbCPI_Revenue.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_InfoDrivers,"D:/working directory/CENTRODECOSTOS/imputs/Total_InfoDrivers.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_dicDirectCost_New,"D:/working directory/CENTRODECOSTOS/imputs/Total_dicDirectCost_New.csv",sep=";",dec=",",row.names=FALSE)
+write.table(Total_dbNetRevenue,"D:/working directory/CENTRODECOSTOS/imputs/Total_dbNetRevenue.csv",sep=";",dec=",",row.names=FALSE)
+
+
+Total_dbNetRevenue<-data.frame()
+#NUM3<-data.frame()
+#NUM2<-data.frame()
+
+for(i in 1:num){
+  ARCHIVO<-IMPUTS[i,]
+  NUM3<-data.frame()
+  NUM2<-data.frame()
+  YEAR<-2021
+  GEO<-"COLOMBIA"
+  MARKET<-"DOMESTIC"
+  NUM1 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "Baseline Inputs", range = "A17:M710",na = "0",
+                     col_name=c("TIP","jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"))
+  cliente <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "Baseline Inputs", range = "B4",col_name=c("a"))
+  cliente<-as.character(cliente$a)
+  
+  for(A in 1:47){
+    description<-as.character(NUM1[(A*14)-13,1])
+    for(B in 2:13){
+      currency<-as.character(NUM1[(A*14)-12,B]) #2
+      price<-as.double(NUM1[(A*14)-11,B]) #3
+      quantity<-as.double(NUM1[(A*14)-10,B]) #4
+      MES<-B-1
+      
+      price<-if(is.na(price)){0}else{price}
+      quantity<-if(is.na(quantity)){0}else{quantity}
+     
+      NUM4<-data.frame(MES,currency,price,quantity)
+      
+      NUM3<-rbind(NUM3,NUM4)
+      rm(NUM4)
+    }
+  
+  NUM3$description<-description
+  NUM2<-rbind(NUM2,NUM3)
+  NUM3<-data.frame()
+  }
+  
+  #PENALIZACIÓN
+  for(C in 0:8){
+    description<-as.character(NUM1[660+(C*4),1])
+    for(D in 2:13){
+      currency<-as.character(NUM1[660+(C*4),D]) #2
+      price<-as.double(NUM1[660+(C*4),D]) #3
+      quantity<-as.double(1) #4
+      MES<-D-1
+      price<-if(is.na(price)){0}else{price}
+      NUM4<-data.frame(MES,currency,price,quantity)
+      NUM3<-rbind(NUM3,NUM4)
+      rm(NUM4)
+    }
+    NUM3$description<-description
+    NUM2<-rbind(NUM2,NUM3)
+    NUM3<-data.frame() 
+  }
+  
+  NUM2$CLIENTE<-cliente
+  NUM2$year<-YEAR
+  NUM2$geo<-GEO
+  NUM2$market<-MARKET
+  Total_dbNetRevenue<-rbind(Total_dbNetRevenue,NUM2)
+  NUM2<-data.frame()
+}
+
+#PRUEBA
+for(i in 1:num){
+  ARCHIVO<-IMPUTS[i,]
+  
+  YEAR<-2021
+  GEO<-"COLOMBIA"
+  MARKET<-"DOMESTIC"
+  
+  
+  NUM1 <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "Summary", range = "B3:N14",na = "0",
+                     col_name=c("TIPO","jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"))
+  cliente <- read_excel(str_c(DIRECCIÓN,ARCHIVO),sheet = "Baseline Inputs", range = "B4",col_name=c("a"))
+  cliente<-as.character(cliente$a)
+  NUM1$CLIENTE<-cliente
+  NUM1$year<-YEAR
+  NUM1$geo<-GEO
+  NUM1$market<-MARKET
+  
+  NUM1 <- NUM1[c('CLIENTE','year','geo','market','TIPO','jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec')]
+  
+  Total_dbNetRevenue<-rbind(Total_dbNetRevenue,NUM1)
+  NUM1<-data.frame()
+}
+
+
+write.table(NUM2,"D:/working directory/CENTRODECOSTOS/imputs/Total_dbNetRevenue_V3.csv",sep=";",dec=",",row.names=FALSE)
+Total_dbNetRevenue %>%group_by(CLIENTE) %>% summarise(precio = sum(price*quantity))
